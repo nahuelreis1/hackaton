@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WOL — Simulación Mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0a0c11;
+  --night-2:#0e1118;
+  --panel:#12151d;
+  --panel-2:#171b25;
+  --line:#242a38;
+  --line-2:#303749;
+  --volt:#e7ff2b;
+  --volt-soft:rgba(231,255,43,.14);
+  --safe:#38d98f;
+  --warn:#f5b945;
+  --hot:#ff4a5e;
+  --fog:#97a0b4;
+  --fog-2:#6a7388;
+  --white:#f2f4f8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#0a0c11;
+  display:flex;align-items:center;justify-content:center;
+  min-height:100svh;padding:20px;
+  font-family:'Inter',system-ui,sans-serif;
+}
+
+/* ============ PHONE ============ */
+.phone{
+  width:min(420px,100%);height:min(860px,92svh);min-height:640px;
+  border-radius:42px;border:1px solid var(--line-2);
+  background:#07090d;position:relative;overflow:hidden;
+  box-shadow:0 0 0 8px #11141b,0 0 0 9px var(--line),0 40px 90px -30px rgba(0,0,0,.9),0 0 80px -20px rgba(231,255,43,.12);
+  display:flex;flex-direction:column;
+  user-select:none;-webkit-user-select:none;
+}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:110px;height:24px;border-radius:13px;background:#000;z-index:40;border:1px solid #1a1e28}
+
+/* app top */
+.app-top{
+  padding:44px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:linear-gradient(180deg,rgba(7,9,13,.95),rgba(7,9,13,.78) 70%,transparent);
+  position:absolute;top:0;left:0;right:0;z-index:30;pointer-events:none;
+}
+.app-top>*{pointer-events:auto}
+.app-brand{display:flex;align-items:center;gap:8px}
+.app-brand img{width:28px;height:28px;border-radius:7px}
+.app-brand span{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:.06em;font-size:1.05rem}
+.guard-pill{
+  display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--safe);
+  padding:6px 11px;border-radius:999px;border:1px solid rgba(56,217,143,.35);background:rgba(56,217,143,.08);
+}
+.guard-pill i{width:7px;height:7px;border-radius:50%;background:var(--safe);animation:blink 1.8s infinite}
+
+/* screens */
+.screen{position:absolute;inset:0;display:none;flex-direction:column}
+.screen.active{display:flex}
+
+/* MAP screen */
+#mapviewport{position:absolute;inset:0;overflow:hidden;background:#0b0e14;touch-action:none;cursor:grab}
+#mapviewport:active{cursor:grabbing}
+#rosario-svg{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform}
+.zone-blob{cursor:pointer;transition:opacity .2s}
+.zone-blob:hover{opacity:.95}
+.zlabel{font-family:'JetBrains Mono',monospace;fill:#aab2c6;font-size:13px;letter-spacing:.04em;pointer-events:none;text-transform:uppercase}
+.zlabel.hot{fill:#ffb3bb}
+.zlabel.warnl{fill:#ffe2a8}
+.street-name{font-family:'JetBrains Mono',monospace;fill:#5b6478;font-size:11px;letter-spacing:.08em;pointer-events:none}
+.landmark{font-family:'Inter',sans-serif;fill:#8b94aa;font-size:11.5px;pointer-events:none}
+
+.map-controls{position:absolute;right:12px;top:108px;z-index:25;display:flex;flex-direction:column;gap:8px}
+.mc-btn{
+  width:40px;height:40px;border-radius:11px;border:1px solid var(--line-2);background:rgba(13,16,23,.92);
+  color:var(--white);font-size:1.15rem;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(6px);
+}
+.mc-btn:active{background:#1a1f2b}
+
+.map-search{
+  position:absolute;left:12px;right:64px;top:108px;z-index:25;
+}
+.map-search button{
+  width:100%;display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:13px;
+  border:1px solid var(--line-2);background:rgba(13,16,23,.92);backdrop-filter:blur(6px);
+  color:var(--fog);font-family:'Inter';font-size:.92rem;cursor:pointer;text-align:left;
+}
+.map-search button b{color:var(--white);font-weight:600}
+
+.legend-float{
+  position:absolute;left:12px;bottom:170px;z-index:25;display:flex;gap:11px;
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.04em;color:var(--fog);
+  padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(13,16,23,.88);backdrop-filter:blur(6px);
+}
+.legend-float i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+
+/* vecino alerta FAB */
+.fab-report{
+  position:absolute;right:12px;bottom:170px;z-index:25;
+  display:flex;align-items:center;gap:8px;padding:13px 16px;border-radius:999px;
+  border:1px solid rgba(231,255,43,.4);background:rgba(231,255,43,.1);backdrop-filter:blur(6px);
+  color:var(--volt);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.92rem;cursor:pointer;
+}
+.fab-report:active{background:rgba(231,255,43,.2)}
+
+/* bottom sheet (zona) */
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;z-index:35;
+  background:#10131b;border-top:1px solid var(--line-2);border-radius:22px 22px 0 0;
+  transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.25,1);
+  max-height:72%;display:flex;flex-direction:column;
+  box-shadow:0 -20px 50px rgba(0,0,0,.6);
+}
+.sheet.open{transform:translateY(0)}
+.sheet-grab{width:42px;height:4px;border-radius:4px;background:var(--line-2);margin:10px auto 4px;flex:none}
+.sheet-body{overflow-y:auto;padding:8px 18px 90px}
+.sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px}
+.sheet-head h3{font-family:'Space Grotesk',sans-serif;font-size:1.25rem;letter-spacing:-.01em}
+.risk-tag{
+  flex:none;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:6px 11px;border-radius:8px;font-weight:700;
+}
+.risk-tag.alto{color:#ff8d99;border:1px solid rgba(255,74,94,.45);background:rgba(255,74,94,.1)}
+.risk-tag.medio{color:#ffd28a;border:1px solid rgba(245,185,69,.45);background:rgba(245,185,69,.1)}
+.sheet-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}
+.sstat{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--panel)}
+.sstat b{display:block;font-family:'Space Grotesk',sans-serif;font-size:1.3rem;line-height:1.1}
+.sstat span{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--fog-2)}
+.sheet h4{
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--fog-2);margin:18px 0 10px;
+}
+.tipo-chips{display:flex;flex-wrap:wrap;gap:7px}
+.tipo-chips span{
+  font-size:.82rem;padding:6px 11px;border-radius:999px;border:1px solid var(--line-2);color:#cdd2e2;background:var(--panel);
+}
+.tipo-chips span b{color:var(--volt);font-family:'JetBrains Mono',monospace;font-size:.78rem;margin-left:4px}
+.comment{border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:var(--panel);margin-bottom:9px}
+.comment .ch{display:flex;justify-content:space-between;gap:8px;margin-bottom:5px}
+.comment .ch b{font-size:.86rem;font-weight:600}
+.comment .ch small{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--fog-2)}
+.comment p{font-size:.88rem;color:#c2c8d8}
+.sheet-route-btn{
+  width:100%;margin-top:16px;padding:15px;border-radius:13px;border:0;cursor:pointer;
+  background:var(--volt);color:#0a0c11;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;
+}
+
+/* route demo overlay card */
+.route-card{
+  position:absolute;left:12px;right:12px;top:108px;z-index:26;display:none;
+  border:1px solid var(--line-2);border-radius:15px;background:rgba(13,16,23,.95);backdrop-filter:blur(8px);
+  padding:14px 15px;
+}
+.route-card.show{display:block}
+.route-card .rrow{display:flex;align-items:center;gap:10px;font-size:.9rem;margin-bottom:7px}
+.route-card .rrow:last-child{margin-bottom:0}
+.route-card .pt{width:9px;height:9px;border-radius:50%;flex:none}
+.route-opts{display:flex;gap:8px;margin-top:11px}
+.ropt{
+  flex:1;border-radius:11px;padding:10px 11px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);
+  font-size:.82rem;color:var(--fog);text-align:left;
+}
+.ropt b{display:block;color:var(--white);font-size:.9rem;margin-bottom:2px;font-family:'Space Grotesk',sans-serif}
+.ropt.safe-sel{border-color:rgba(56,217,143,.55);background:rgba(56,217,143,.08)}
+.ropt.safe-sel b{color:var(--safe)}
+.ropt .meta{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.04em}
+.route-close{position:absolute;top:9px;right:11px;background:none;border:0;color:var(--fog-2);font-size:1.1rem;cursor:pointer}
+
+/* ALERTAS screen */
+.list-screen{position:absolute;inset:0;overflow-y:auto;padding:104px 14px 175px;background:#0b0e14}
+.alert-tabs{display:flex;gap:7px;margin-bottom:13px}
+.alert-tabs button{
+  flex:1;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fog);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+}
+.alert-tabs button.on{border-color:rgba(231,255,43,.45);color:var(--volt);background:rgba(231,255,43,.06)}
+
+/* SOS screen */
+.sos-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:104px 26px 175px;background:#0b0e14;text-align:center}
+.name-input-wrp{width:100%;max-width:280px}
+.name-input-wrp label{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--fog-2);margin-bottom:6px;text-align:left}
+.name-input-wrp input{
+  width:100%;padding:11px 14px;border-radius:11px;border:1px solid var(--line-2);background:var(--panel);
+  color:var(--white);font-family:'Inter';font-size:.92rem;outline:none;text-align:center;
+}
+.name-input-wrp input:focus{border-color:var(--volt);box-shadow:0 0 0 3px rgba(231,255,43,.12)}
+.name-input-wrp input::placeholder{color:var(--fog-2)}
+.sos-screen h3{font-family:'Space Grotesk',sans-serif;font-size:1.3rem;letter-spacing:-.01em}
+.sos-screen p{color:var(--fog);font-size:.92rem;max-width:30ch}
+.pwr-sim{
+  width:170px;height:170px;border-radius:50%;cursor:pointer;border:2px solid rgba(231,255,43,.5);
+  background:radial-gradient(circle at 50% 38%, rgba(231,255,43,.16), rgba(13,16,23,.95) 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  font-family:'Space Grotesk',sans-serif;color:var(--white);
+  box-shadow:0 0 50px -10px rgba(231,255,43,.35);
+  transition:transform .08s ease;position:relative;
+}
+.pwr-sim:active{transform:scale(.96)}
+.pwr-sim .ic{font-size:2.1rem;color:var(--volt)}
+.pwr-sim .cnt{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--fog)}
+.pwr-sim .ring{
+  position:absolute;inset:-2px;border-radius:50%;border:3px solid var(--volt);
+  clip-path:polygon(50% 50%,50% 0,50% 0,50% 50%);opacity:0;
+}
+.alt-acts{display:flex;flex-direction:column;gap:8px;width:100%;max-width:300px}
+.alt-acts span{
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fog);
+  border:1px dashed var(--line-2);border-radius:10px;padding:10px 13px;display:flex;align-items:center;gap:9px;
+}
+.alt-acts b{color:var(--volt)}
+
+/* EMERGENCY overlay */
+.emergency{
+  position:absolute;inset:0;z-index:60;display:none;flex-direction:column;
+  background:
+    radial-gradient(600px 400px at 50% -10%, rgba(255,74,94,.22), transparent 70%),
+    #0a0507;
+}
+.emergency.show{display:flex;animation:eflash .5s ease}
+@keyframes eflash{0%{background-color:#3d0a12}100%{background-color:#0a0507}}
+.em-top{padding:52px 20px 14px;text-align:center}
+.em-top .badge{
+  display:inline-flex;align-items:center;gap:9px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#ff8d99;
+  padding:9px 16px;border-radius:999px;border:1px solid rgba(255,74,94,.5);background:rgba(255,74,94,.1);
+}
+.em-top .badge i{width:8px;height:8px;border-radius:50%;background:var(--hot);animation:blink .9s infinite}
+.em-top h3{font-family:'Space Grotesk',sans-serif;font-size:1.45rem;margin-top:13px;letter-spacing:-.01em}
+.em-top p{color:#c9a8ad;font-size:.88rem;margin-top:4px}
+.em-body{flex:1;overflow-y:auto;padding:8px 18px 20px;display:flex;flex-direction:column;gap:10px}
+.em-row{
+  display:flex;align-items:center;gap:13px;border:1px solid rgba(255,74,94,.25);border-radius:14px;
+  padding:14px 15px;background:rgba(20,10,13,.7);
+}
+.em-row .ic{font-size:1.3rem;flex:none}
+.em-row b{display:block;font-size:.93rem;font-weight:600}
+.em-row small{color:#c9a8ad;font-size:.8rem}
+.em-row .st{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--safe);white-space:nowrap}
+.em-map{
+  border:1px solid rgba(255,74,94,.3);border-radius:14px;height:130px;position:relative;overflow:hidden;
+  background:#0d1016;flex:none;
+}
+.em-map .you{
+  position:absolute;left:50%;top:50%;width:14px;height:14px;border-radius:50%;background:var(--volt);
+  transform:translate(-50%,-50%);box-shadow:0 0 0 5px rgba(231,255,43,.25);
+}
+.em-map .you::after{
+  content:"";position:absolute;inset:-14px;border-radius:50%;border:2px solid rgba(231,255,43,.5);animation:sonar 1.6s infinite;
+}
+@keyframes sonar{0%{transform:scale(.4);opacity:1}100%{transform:scale(1.8);opacity:0}}
+.em-shield{
+  border:1px solid rgba(231,255,43,.4);border-radius:14px;padding:14px 15px;background:rgba(231,255,43,.06);
+  font-size:.88rem;color:#e8ebda;
+}
+.em-shield b{color:var(--volt)}
+.em-cancel{
+  margin:0 18px 26px;padding:15px;border-radius:13px;border:1px solid var(--line-2);background:#12151d;
+  color:var(--fog);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.95rem;cursor:pointer;flex:none;
+}
+
+/* report quick modal */
+.qreport{
+  position:absolute;inset:0;z-index:55;display:none;align-items:flex-end;background:rgba(5,6,9,.6);backdrop-filter:blur(3px);
+}
+.qreport.show{display:flex}
+.qreport-card{
+  width:100%;background:#10131b;border-top:1px solid var(--line-2);border-radius:22px 22px 0 0;padding:18px 18px 30px;
+}
+.qreport-card h3{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;margin-bottom:4px}
+.qreport-card p{color:var(--fog);font-size:.85rem;margin-bottom:14px}
+.qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.qr-grid button{
+  padding:13px 8px;border-radius:12px;border:1px solid var(--line-2);background:var(--panel);color:#d6dbe8;
+  font-size:.82rem;cursor:pointer;display:flex;flex-direction:column;gap:5px;align-items:center;
+}
+.qr-grid button span{font-size:1.25rem}
+.qr-grid button:active{border-color:var(--volt);color:var(--volt)}
+.qr-done{
+  display:none;margin-top:14px;text-align:center;color:var(--safe);font-family:'JetBrains Mono',monospace;font-size:12px;
+}
+
+/* PERFIL screen */
+.perfil-card{border:1px solid var(--line);border-radius:14px;padding:15px 16px;background:var(--panel);margin-bottom:11px}
+.perfil-card h4{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--fog-2);margin-bottom:10px}
+.contact-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px solid var(--line)}
+.contact-row:last-child{border-bottom:0}
+.contact-row .av{
+  width:34px;height:34px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line-2);
+  display:grid;place-items:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.85rem;color:var(--volt);flex:none;
+}
+.contact-row b{font-size:.9rem;display:block}
+.contact-row small{color:var(--fog-2);font-size:.78rem}
+.inst-badge{
+  display:flex;align-items:center;gap:12px;border:1px solid rgba(231,255,43,.35);border-radius:14px;
+  padding:14px 16px;background:linear-gradient(160deg,rgba(231,255,43,.08),var(--panel));margin-bottom:11px;
+}
+.inst-badge .ic{font-size:1.5rem}
+.inst-badge b{display:block;font-size:.92rem}
+.inst-badge small{color:var(--fog);font-size:.8rem}
+
+/* tab bar */
+.tabbar{
+  position:absolute;left:0;right:0;bottom:0;z-index:38;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  background:rgba(9,11,16,.96);border-top:1px solid var(--line);backdrop-filter:blur(10px);
+  padding:9px 8px calc(14px + env(safe-area-inset-bottom));
+}
+.tabbar button{
+  background:none;border:0;color:var(--fog-2);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;border-radius:11px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+}
+.tabbar button .ti{font-size:1.25rem;line-height:1}
+.tabbar button.on{color:var(--volt)}
+.tabbar button.sos-tab{color:#ff8d99}
+.tabbar button.sos-tab.on{color:var(--hot)}
+
+/* toast */
+.toast{
+  position:absolute;left:50%;bottom:185px;transform:translateX(-50%) translateY(20px);z-index:45;
+  background:#161a24;border:1px solid var(--line-2);border-radius:11px;padding:10px 16px;
+  font-size:.85rem;color:var(--white);opacity:0;transition:all .25s ease;pointer-events:none;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* animaciones */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="notch"></div>
+
+  <div class="app-top">
+    <div class="app-brand"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAABH7UlEQVR42u29ebxkVXX3/V17n6Gq7tQTzTwINBgRRVujCBGiBjU8GvWxeWIcX6PRxAGjRmOMyuMQEceIKCIqziiKxgEMxIgDtqgtjXbLPNgNTc99xxrOOXuv9499qm7d6rpTd4Pm877l58rtujWcs/faa/ittX5LVDUGtPyh53dERFXVAML0w5Sv8V3Pa/m7AvF1110nO3bskDPOOMOuXLkyBhzQWrJkSSvPc0TC24qiwIiQpAmjo2MR4EZGRlRVUVXyPMcY0/kB8N6h2rk+RATvPaoeVTDSdanl39uXqB6MNQiCTt8mIoKq4oqi61kwxiAiOOcQEYwxqCrWWqw1eB+us/vhvcd73/m3tZbIWpz3hPvyeK+dz7fW4pxjcnJSyrWtAtx11112fHxcjjjiCLdt27bWSc2TlNWdy5Ny/aPy365r77ovSHr2rvuhoqqWOR4i4roEwHcJgAC2vAAB/Lp168iyTE899VQL5MMjw63xsfHlW7ZsOei/r/vJ6f/1X/+d3n/fJpOm6ZCNk0jVq6qqiEoURUklSRIVEV8UTkXVe4htZFSMFZFy93HgfFg8a5yoiIqqcyoiXlVVDGb6FlVVpVwQY8WqqDoJ4iBO0VIScd477xwefPgC70kqiY2MTTwgagQTnlcRsaKq0zdhmLE4ghFDy7nCOadWxCioV1W8B4NPoiS21kZqxW/ZtGXb4ODA1Bl//sTqKY9+9G1PPuOMjcDowEBtfGqqXlu7dq3eeuut+pKXvCQr1126DqDvOoDzPbpf4+cVgK4vEcCLhMVU1QSIgWjr1jtT5yru8MMPbwD5xMTEqgsvvOjJ6369/qRdo3uecvdddy8vnF9Sn5okzzO8aji5tE+n4nyBd67UIdK5VCMWQfCqhGOv4VQjUL5XAdEZh75r/3vPgi8/RnteGE76jOUpl1SUcHJnHCwNL52+1G59En60vJVSm4Vrnqm5KJ8TEeI4ZnBgEK++GBocGjvmIcfcevjhh/3X2U99+k+f85xn/qJarY01GvXB66+/XlatWqUrV65sdE5yEH7pOpy9d97+d/d+F1K+qf3T/iDbo+59tyYof7dbt26t7NixIzn55JM9EH/jG984/fNf+PKz7r777qdu277jkHqjRbPVRIzFeVVR742RGWpXOpuonR0L+6OlgJjOItGjave6PZGZt13+TUt1K6KznhERW363Mn0pQQKkvOaZqn6mppVuYWpvvmrX34KZan9WuLduQQ1C4pzrbJIxhpHhEUZGRvIjDz/sxkc88hHfOu/t531n2bLBe8bGxuIf//jHraGhoezMM8/07X0pP8v2qH8pTUR/ddAlOf0EoFsTdOz/FdddV1tz5pktQD956aX/+9vf/ParfrNhw+k7d+ySZivDRNZHUeKjOLGKUjgVdQ4R7bP4dBZzxiILCDPdj/ZC6yzCoKV26X1u/k0znZe0X98Wyt7P6/dZey/r3tfsve/83vY5el9T/r+KEURQ79Q77yJBqVVSjjnyiN2nPeEJXzr/gn+7+OBDDv7dL3/xy8GHX3FFXc87T3p8MkrzbMrn+wmAlx4nUEXE9yyeTK8Oet555/GMZzyjsnr16uKnP/35n37ggx/45xtvXH/2/fffj3OeOI6dGmsUEVTAGBAJS+X9zEXTtpOmMwSgszhtVY9Mq3Pp0u09Sq7/Ri1cAKZf1+3Xzmcd9/4s1b03ue2ozhSAXoGavpm2ptS2PlGvLm+pyzK7ZGSYY445ZtOzn/XMT7z9vLdfBNTXrVuXrl69utXHKZ9LA3gp1bqWm2y67qytDSrl89nGjRsrJ510Ug4kr3/Tv5x79dXff8vmzffW8rxQG1lV78V7v9cZ79i6fqe8xwtXSls5u1fax7jv32MurTJTjS9MCy30O+d6f+f7SrPmfdg/I6LeO+e9... (truncated to 2000 chars)"><span>WOL</span></div>
+    <div class="guard-pill"><i></i>Protegido</div>
+  </div>
+
+  <!-- SCREEN: MAPA -->
+  <div class="screen" id="scr-mapa">
+    <div id="mapviewport">
+      <div id="rosario-svg">
+        <svg width="1000" height="1200" viewBox="0 0 1000 1200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="blob" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="16"/>
+            </filter>
+            <filter id="blobsoft" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="22"/>
+            </filter>
+          </defs>
+
+          <!-- base -->
+          <rect width="1000" height="1200" fill="#0b0e14"/>
+
+          <!-- street grid (centro) -->
+          <g stroke="#171c27" stroke-width="2">
+            <path d="M280 280H800M280 330H810M280 380H820M280 430H830M280 480H830M280 530H820M280 580H810M280 630H800M280 680H790M280 730H780M280 780H770"/>
+            <path d="M330 240V820M380 240V840M430 240V860M480 240V880M530 240V900M580 240V920M630 250V930M680 260V920M730 280V900"/>
+          </g>
+          <g stroke="#141925" stroke-width="2">
+            <path d="M300 880H740M300 950H720M300 1020H700M340 880V1090M420 880V1100M500 880V1110M580 900V1110M660 900V1100"/>
+            <path d="M300 120H600M300 170H620M340 80V240M420 80V240M500 90V250M560 100V250"/>
+          </g>
+
+          <!-- Circunvalación -->
+          <path d="M430 50 C260 140 150 300 150 520 C150 760 220 960 470 1160" stroke="#222a3a" stroke-width="9" fill="none"/>
+          <text class="street-name" x="158" y="500" transform="rotate(-87 168 500)">AV. CIRCUNVALACIÓN</text>
+
+          <!-- Bv. Oroño -->
+          <path d="M598 230 V940" stroke="#2a3144" stroke-width="7" fill="none"/>
+          <text class="street-name" x="608" y="350" transform="rotate(90 608 350)">BV. OROÑO</text>
+
+          <!-- Av. Pellegrini -->
+          <path d="M270 600 H790" stroke="#2a3144" stroke-width="7" fill="none"/>
+          <text class="street-name" x="320" y="592">AV. PELLEGRINI</text>
+
+          <!-- Córdoba -->
+          <path d="M300 470 H800" stroke="#262d3f" stroke-width="5" fill="none"/>
+          <text class="street-name" x="430" y="462">CÓRDOBA</text>
+
+          <!-- 27 de Febrero -->
+          <path d="M280 740 H770" stroke="#262d3f" stroke-width="5" fill="none"/>
+          <text class="street-name" x="320" y="732">BV. 27 DE FEBRERO</text>
+
+          <!-- Río Paraná -->
+          <path d="M620 0 C700 80 760 200 800 330 C840 460 850 620 845 760 C840 920 850 1060 880 1200 L1000 1200 L1000 0 Z" fill="#14283c"/>
+          <path d="M620 0 C700 80 760 200 800 330 C840 460 850 620 845 760 C840 920 850 1060 880 1200" stroke="#27486a" stroke-width="3" fill="none"/>
+          <g stroke="#1d3852" stroke-width="2" opacity=".7">
+            <path d="M730 120 C770 200 800 300 825 420"/>
+            <path d="M860 200 C890 320 900 480 895 640"/>
+          </g>
+          <text class="landmark" x="845" y="540" fill="#4f7ba3" font-style="italic" transform="rotate(83 845 540)">Río Paraná</text>
+          <ellipse cx="920" cy="260" rx="55" ry="120" fill="#16314a"/>
+          <ellipse cx="950" cy="700" rx="40" ry="160" fill="#16314a"/>
+
+          <!-- Parque Independencia -->
+          <ellipse cx="585" cy="660" rx="52" ry="40" fill="#16301f" stroke="#2c5238" stroke-width="2"/>
+          <text class="landmark" x="585" y="664" text-anchor="middle" fill="#69a87e" font-size="10">Pque. Independencia</text>
+
+          <!-- ZONAS CALIENTES (rojas) -->
+          <g id="zones">
+            <ellipse class="zone-blob" data-zone="empalme" cx="345" cy="225" rx="78" ry="55" fill="rgba(255,74,94,.34)" filter="url(#blobsoft)"/>
+            <ellipse class="zone-blob" data-zone="empalme" cx="345" cy="225" rx="40" ry="28" fill="rgba(255,74,94,.5)" filter="url(#blob)"/>
+            <text class="zlabel hot" x="345" y="228" text-anchor="middle">Empalme Graneros</text>
+
+            <ellipse class="zone-blob" data-zone="ludu" cx="435" cy="330" rx="62" ry="46" fill="rgba(255,74,94,.32)" filter="url(#blobsoft)"/>
+            <ellipse class="zone-blob" data-zone="ludu" cx="435" cy="330" rx="32" ry="23" fill="rgba(255,74,94,.48)" filter="url(#blob)"/>
+            <text class="zlabel hot" x="435" y="333" text-anchor="middle">Ludueña</text>
+
+            <ellipse class="zone-blob" data-zone="triangulo" cx="555" cy="170" rx="64" ry="44" fill="rgba(255,74,94,.3)" filter="url(#blobsoft)"/>
+            <text class="zlabel hot" x="555" y="173" text-anchor="middle">Triángulo y Moderno</text>
+
+            <ellipse class="zone-blob" data-zone="banana" cx="400" cy="555" rx="58" ry="44" fill="rgba(255,74,94,.32)" filter="url(#blobsoft)"/>
+            <ellipse class="zone-blob" data-zone="banana" cx="400" cy="555" rx="30" ry="22" fill="rgba(255,74,94,.46)" filter="url(#blob)"/>
+            <text class="zlabel hot" x="400" y="558" text-anchor="middle">Villa Banana</text>
+
+            <ellipse class="zone-blob" data-zone="bella" cx="455" cy="705" rx="60" ry="44" fill="rgba(255,74,94,.3)" filter="url(#blobsoft)"/>
+            <text class="zlabel hot" x="455" y="708" text-anchor="middle">Bella Vista</text>
+
+            <ellipse class="zone-blob" data-zone="tablada" cx="690" cy="810" rx="66" ry="48" fill="rgba(255,74,94,.34)" filter="url(#blobsoft)"/>
+            <ellipse class="zone-blob" data-zone="tablada" cx="690" cy="810" rx="34" ry="24" fill="rgba(255,74,94,.5)" filter="url(#blob)"/>
+            <text class="zlabel hot" x="690" y="813" text-anchor="middle">Tablada</text>
+
+            <ellipse class="zone-blob" data-zone="viahonda" cx="580" cy="895" rx="56" ry="40" fill="rgba(255,74,94,.3)" filter="url(#blobsoft)"/>
+            <text class="zlabel hot" x="580" y="898" text-anchor="middle">Vía Honda</text>
+
+            <ellipse class="zone-blob" data-zone="flores" cx="555" cy="1035" rx="68" ry="48" fill="rgba(255,74,94,.32)" filter="url(#blobsoft)"/>
+            <text class="zlabel hot" x="555" y="1038" text-anchor="middle">Las Flores</text>
+
+            <!-- precaución (amarillas) -->
+            <ellipse class="zone-blob" data-zone="centro" cx="715" cy="500" rx="62" ry="50" fill="rgba(245,185,69,.26)" filter="url(#blobsoft)"/>
+            <text class="zlabel warnl" x="715" y="503" text-anchor="middle">Centro</text>
+
+            <ellipse class="zone-blob" data-zone="pichincha" cx="645" cy="385" rx="48" ry="36" fill="rgba(245,185,69,.26)" filter="url(#blobsoft)"/>
+            <text class="zlabel warnl" x="645" y="388" text-anchor="middle">Pichincha</text>
+          </g>
+
+          <!-- landmarks -->
+          <g>
+            <rect x="782" y="442" width="10" height="26" fill="#c8cfdf"/>
+            <text class="landmark" x="800" y="452">Monumento</text>
+            <text class="landmark" x="800" y="466">a la Bandera</text>
+          </g>
+          <circle cx="470" cy="600" r="7" fill="#e7ff2b" stroke="#0b0e14" stroke-width="2"/>
+          <text class="landmark" x="470" y="585" text-anchor="middle" fill="#e7ff2b" font-weight="600">UCA Rosario</text>
+
+          <!-- RUTAS (ocultas hasta demo) -->
+          <g id="routes" style="display:none">
+            <path id="route-fast" d="M470 600 L560 480 L645 385" stroke="#ff4a5e" stroke-width="6" stroke-dasharray="10 10" fill="none" opacity=".75" stroke-linecap="round"/>
+            <path id="route-safe" d="M470 600 L598 600 L598 400 L598 388 L645 385" stroke="#38d98f" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="470" cy="600" r="10" fill="#38d98f" stroke="#0b0e14" stroke-width="3"/>
+            <circle cx="645" cy="385" r="11" fill="#e7ff2b" stroke="#0b0e14" stroke-width="3">
+              <animate attributeName="r" values="11;15;11" dur="1.6s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="map-search"><button id="btn-route">🔍 <span>¿A dónde vas? <b>Probá: UCA → Pichincha</b></span></button></div>
+
+    <div class="map-controls">
+      <button class="mc-btn" id="zoom-in" aria-label="Acercar">+</button>
+      <button class="mc-btn" id="zoom-out" aria-label="Alejar">−</button>
+      <button class="mc-btn" id="zoom-reset" aria-label="Centrar" style="font-size:.95rem">◎</button>
+    </div>
+
+    <div class="legend-float">
+      <span><i style="background:#38d98f"></i>Seguro</span>
+      <span><i style="background:#f5b945"></i>Precaución</span>
+      <span><i style="background:#ff4a5e"></i>Caliente</span>
+    </div>
+
+    <button class="fab-report" id="fab-report">＋ Vecino alerta</button>
+
+    <div class="route-card" id="route-card">
+      <button class="route-close" id="route-close">✕</button>
+      <div class="rrow"><span class="pt" style="background:#38d98f"></span> UCA Rosario · Av. Pellegrini 3314</div>
+      <div class="rrow"><span class="pt" style="background:#e7ff2b"></span> Pichincha · Bar con amigos</div>
+      <div class="route-opts">
+        <button class="ropt safe-sel">
+          <b>Ruta segura · WOL</b>
+          <span class="meta">21 min · 0 zonas calientes</span>
+        </button>
+        <button class="ropt">
+          <b style="color:#ff8d99">Ruta rápida</b>
+          <span class="meta">17 min · cruza 1 zona con 12 alertas</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- bottom sheet de zona -->
+    <div class="sheet" id="zone-sheet">
+      <div class="sheet-grab"></div>
+      <div class="sheet-body" id="sheet-body"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: ALERTAS -->
+  <div class="screen" id="scr-alertas">
+    <div class="list-screen">
+      <div class="alert-tabs">
+        <button class="on" data-f="todo">Todo</button>
+        <button data-f="ia">Agentes IA</button>
+        <button data-f="vecinos">Vecinos</button>
+      </div>
+      <div class="feed" style="border:0;background:transparent" id="alert-feed"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: SOS -->
+  <div class="screen active" id="scr-sos">
+    <div class="sos-screen">
+      <h3>SOS silencioso</h3>
+      <p>En la vida real lo activás <b style="color:var(--white)">a ciegas, dentro del bolsillo</b>. Acá, simulalo tocando:</p>
+      <div class="name-input-wrp">
+        <label>Tu nombre</label>
+        <input type="text" id="user-name" placeholder="Ej: Nahuel" maxlength="30" autocomplete="off">
+      </div>
+      <div class="name-input-wrp" style="margin-top:-6px">
+        <label>¿Dónde estás?</label>
+        <select id="user-location" style="width:100%;padding:11px 14px;border-radius:11px;border:1px solid var(--line-2);background:var(--panel);color:var(--white);font-family:'Inter';font-size:.92rem;outline:none;text-align:center;appearance:none;-webkit-appearance:none;cursor:pointer">
+          <option value="Av. Pellegrini 3300">UCA · Av. Pellegrini 3300</option>
+          <option value="Centro">Centro · Peatonal Córdoba</option>
+          <option value="Pichincha">Pichincha · Bar</option>
+          <option value="Ludueña">Ludueña</option>
+          <option value="Empalme Graneros">Empalme Graneros</option>
+          <option value="Tablada">Tablada</option>
+          <option value="Villa Banana">Villa Banana</option>
+          <option value="Bella Vista">Bella Vista</option>
+          <option value="Las Flores">Las Flores</option>
+          <option value="Triángulo">Triángulo y Moderno</option>
+          <option value="Vía Honda">Vía Honda</option>
+        </select>
+      </div>
+      <button class="pwr-sim" id="pwr-sim">
+        <span class="ic">⏻</span>
+        <span style="font-weight:700">×7</span>
+        <span class="cnt" id="pwr-cnt">tocá 7 veces</span>
+      </button>
+      <div class="alt-acts">
+        <span><b>⌚ Double Tap</b> índice + pulgar en Apple Watch</span>
+        <span><b>🔉 Vol − + −</b> secuencia inversa en el bolsillo</span>
+        <span><b>📳 Auto</b> impacto + arrebato → se activa solo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: PERFIL -->
+  <div class="screen" id="scr-perfil">
+    <div class="list-screen">
+      <div class="inst-badge">
+        <span class="ic">🎓</span>
+        <div><b>Plan Institucional · UCA Rosario</b><small>Tu facultad cubre tu cuenta Premium. Seguridad del campus conectada.</small></div>
+      </div>
+      <div class="perfil-card">
+        <h4>Contactos de emergencia</h4>
+        <div class="contact-row"><span class="av">MA</span><div><b>Mamá</b><small>Alerta + ubicación en vivo</small></div></div>
+        <div class="contact-row"><span class="av">WH</span><div><b>Wenceslao</b><small>Alerta + ubicación en vivo</small></div></div>
+        <div class="contact-row"><span class="av">911</span><div><b>Policía Santa Fe</b><small>Llamada automática + posición</small></div></div>
+        <div class="contact-row"><span class="av">UCA</span><div><b>Seguridad UCA</b><small>Si estás a &lt;500 m del campus</small></div></div>
+      </div>
+      <div class="perfil-card">
+        <h4>Modo blindado</h4>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="font-size:.9rem">Una alerta activa solo se apaga con tu PIN</span>
+          <span style="font-family:'JetBrains Mono',monospace;color:var(--volt);border:1px solid rgba(231,255,43,.4);border-radius:8px;padding:5px 10px;font-size:11px">PIN ····</span>
+        </div>
+      </div>
+      <div class="perfil-card">
+        <h4>Tu aporte a la comunidad</h4>
+        <div class="sheet-stats" style="margin:0">
+          <div class="sstat"><b>14</b><span>reportes</span></div>
+          <div class="sstat"><b>312</b><span>personas avisadas</span></div>
+          <div class="sstat"><b style="color:var(--volt)">★ 4.9</b><span>confiabilidad</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMERGENCY OVERLAY -->
+  <div class="emergency" id="emergency">
+    <div class="em-top">
+      <span class="badge"><i></i>Emergencia activa</span>
+      <h3>Tu gente ya lo sabe.</h3>
+      <p>Activada en silencio · la pantalla del teléfono no cambió</p>
+    </div>
+    <div class="em-body">
+      <div class="em-map"><div class="you"></div></div>
+      <div class="em-row"><span class="ic">📍</span><div><b>Ubicación en vivo</b><small>Compartiendo minuto a minuto</small></div><span class="st">● activo</span></div>
+      <div class="em-row"><span class="ic">🎙️</span><div><b>Grabando audio</b><small>Encriptado · solo vos decidís compartirlo</small></div><span class="st">● rec 00:14</span></div>
+      <div class="em-row"><span class="ic">👥</span><div><b>4 contactos notificados</b><small>Mamá · Wenceslao · 911 · Seguridad UCA</small></div><span class="st">✓ enviado</span></div>
+      <div class="em-shield"><b>🔒 Modo blindado:</b> si te quitan el teléfono, el atacante no puede frenar nada. Apagarlo requiere tu PIN.</div>
+    </div>
+    <button class="em-cancel" id="em-cancel">Estoy a salvo — cancelar con PIN ····</button>
+  </div>
+
+  <!-- QUICK REPORT -->
+  <div class="qreport" id="qreport">
+    <div class="qreport-card">
+      <h3>¿Qué viste?</h3>
+      <p>Tu micro-reporte suma contexto al mapa de todos. Anónimo y en 2 toques.</p>
+      <div class="qr-grid">
+        <button data-r="Grupo sospechoso"><span>👀</span>Grupo sospechoso</button>
+        <button data-r="Calle oscura"><span>💡</span>Luminaria rota</button>
+        <button data-r="Arrebato"><span>📱</span>Vi un arrebato</button>
+        <button data-r="Calle cortada"><span>🚧</span>Calle cortada</button>
+        <button data-r="Persona en riesgo"><span>🆘</span>Persona en riesgo</button>
+        <button data-r="Otra cosa"><span>✏️</span>Otra cosa</button>
+      </div>
+      <div class="qr-done" id="qr-done">✓ Reporte sumado al mapa de la comunidad</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- TAB BAR -->
+  <div class="tabbar">
+        <button data-scr="mapa"><span class="ti">🗺️</span>Mapa</button>
+        <button data-scr="alertas"><span class="ti">📡</span>Alertas</button>
+        <button class="sos-tab on" data-scr="sos"><span class="ti">⚡</span>SOS</button>
+    <button data-scr="perfil"><span class="ti">👤</span>Perfil</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- DATA: zonas con info realista ---------- */
+var ZONES = {
+  empalme:{name:"Empalme Graneros",nivel:"alto",alertas:47,trend:"+8 esta semana",
+    tipos:[["Robo armado",19],["Tiroteo",11],["Arrebato",9],["Entradera",8]],
+    fuente:"Detectado por agentes IA en La Capital y grupos vecinales · zona señalada por el Min. de Seguridad de Santa Fe",
+    comments:[
+      {who:"Vecina · Anónimo",when:"hace 2 h",txt:"Eviten la zona de las vías después de las 21. Anoche hubo disparos de nuevo."},
+      {who:"Agente IA · FB Vecinal",when:"hace 5 h",txt:"Grupo 'Vecinos Empalme': reportan motos circulando sin patente por Juan José Paso."}
+    ]},
+  ludu:{name:"Ludueña",nivel:"alto",alertas:38,trend:"+5 esta semana",
+    tipos:[["Robo armado",14],["Tiroteo",10],["Arrebato",8],["Amenazas",6]],
+    fuente:"Cruce de 3 fuentes: noticias locales, X y reportes de vecinos",
+    comments:[
+      {who:"Repartidor · verificado",when:"hace 1 h",txt:"No tomen pedidos acá de noche. La app me desvió por Av. Provincias Unidas y llegué igual."},
+      {who:"Agente IA · Rosario3",when:"ayer",txt:"Nota: refuerzan operativos en Ludueña tras hechos del fin de semana."}
+    ]},
+  triangulo:{name:"Triángulo y Moderno",nivel:"alto",alertas:29,trend:"+3 esta semana",
+    tipos:[["Robo armado",12],["Tiroteo",8],["Entradera",5],["Arrebato",4]],
+    fuente:"Barrio listado entre los 'calientes' por el Ministerio de Seguridad provincial",
+    comments:[
+      {who:"Vecino · Anónimo",when:"hace 4 h",txt:"De día se puede circular por las avenidas. De noche, ni con auto."}
+    ]},
+  banana:{name:"Villa Banana",nivel:"alto",alertas:33,trend:"+4 esta semana",
+    tipos:[["Robo armado",13],["Tiroteo",9],["Arrebato",7],["Amenazas",4]],
+    fuente:"Detectado por agentes IA + 11 micro-reportes de vecinos este mes",
+    comments:[
+      {who:"Vecina · verificada",when:"hace 3 h",txt:"Sobre Av. Francia se puede, no entren a las cortadas."}
+    ]},
+  bella:{name:"Bella Vista",nivel:"alto",alertas:26,trend:"+2 esta semana",
+    tipos:[["Robo armado",10],["Arrebato",8],["Entradera",5],["Tiroteo",3]],
+    fuente:"Zona con frecuencia alta de robos según fuentes oficiales y vecinales",
+    comments:[
+      {who:"Vecino · Anónimo",when:"hace 6 h",txt:"Mejoró con el operativo nuevo pero sigan con cuidado cerca del FFCC."}
+    ]},
+  tablada:{name:"Tablada",nivel:"alto",alertas:41,trend:"+6 esta semana",
+    tipos:[["Robo armado",16],["Tiroteo",12],["Arrebato",8],["Entradera",5]],
+    fuente:"Histórico de hechos violentos · cruzado con noticias en tiempo real",
+    comments:[
+      {who:"Vecina · verificada",when:"hace 2 h",txt:"Si van al hospital Roque Sáenz Peña vayan por Av. San Martín, está más iluminada."},
+      {who:"Agente IA · La Capital",when:"hace 8 h",txt:"Detectado: robo a mano armada en inmediaciones, geocodificado al mapa."}
+    ]},
+  viahonda:{name:"Vía Honda",nivel:"alto",alertas:24,trend:"+2 esta semana",
+    tipos:[["Robo armado",9],["Tiroteo",7],["Arrebato",5],["Amenazas",3]],
+    fuente:"Barrio listado entre los 'calientes' por el Ministerio de Seguridad provincial",
+    comments:[
+      {who:"Vecino · Anónimo",when:"ayer",txt:"Pidan que la app los cruce por Ayacucho, del otro lado está complicado."}
+    ]},
+  flores:{name:"Las Flores",nivel:"alto",alertas:36,trend:"+5 esta semana",
+    tipos:[["Robo armado",14],["Tiroteo",11],["Arrebato",6],["Entradera",5]],
+    fuente:"Cruce de fuentes oficiales, prensa y 9 reportes vecinales",
+    comments:[
+      {who:"Repartidora · verificada",when:"hace 5 h",txt:"La empresa nos rutea con WOL desde el mes pasado. Cero incidentes desde entonces."}
+    ]},
+  centro:{name:"Centro / Peatonal",nivel:"medio",alertas:31,trend:"pico 18–21 h",
+    tipos:[["Arrebato de celular",17],["Mechera",7],["Robo",5],["Punga",2]],
+    fuente:"Delitos predatorios típicos de zona centro: arrebatos y hurtos, según el Min. de Seguridad",
+    comments:[
+      {who:"Estudiante UCA",when:"hace 1 h",txt:"A la salida de la facu por Pellegrini, ojo con el celular en la mano."},
+      {who:"Agente IA · X",when:"hace 3 h",txt:"Arrebato reportado en Córdoba al 1200. Tercero esta semana en esa cuadra."}
+    ]},
+  pichincha:{name:"Pichincha",nivel:"medio",alertas:18,trend:"pico viernes/sábado",
+    tipos:[["Arrebato",9],["Acoso callejero",5],["Robo",4]],
+    fuente:"Zona gastronómica nocturna: riesgo bajo de día, sube de madrugada",
+    comments:[
+      {who:"Vecina · verificada",when:"hace 30 min",txt:"Saliendo de los bares pidan la ruta segura, las cortadas a oscuras no."}
+    ]}
+};
+
+/* ---------- helpers ---------- */
+function $S(s){return document.querySelector(s)}
+function $$S(s){return document.querySelectorAll(s)}
+function toast(msg){var t=$S("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove("show")},2200)}
+
+/* ---------- TABS ---------- */
+$$S(".tabbar button").forEach(function(b){
+  b.addEventListener("click",function(){
+    $$S(".tabbar button").forEach(function(x){x.classList.remove("on")});
+    b.classList.add("on");
+    $$S(".screen").forEach(function(s){s.classList.remove("active")});
+    $S("#scr-"+b.dataset.scr).classList.add("active");
+    $S("#zone-sheet").classList.remove("open");
+  });
+});
+
+/* ---------- MAPA: pan & zoom ---------- */
+var vp=$S("#mapviewport"), svgWrap=$S("#rosario-svg");
+var MAPW=1000, MAPH=1200;
+var scale=1, tx=0, ty=0, minScale=.4;
+
+function apply(){svgWrap.style.transform="translate("+tx+"px,"+ty+"px) scale("+scale+")"}
+function clamp(){
+  var vw=vp.clientWidth, vh=vp.clientHeight;
+  var w=MAPW*scale, h=MAPH*scale;
+  tx=Math.min(40, Math.max(vw-w-40, tx));
+  ty=Math.min(40, Math.max(vh-h-40, ty));
+  if(w<vw) tx=(vw-w)/2;
+  if(h<vh) ty=(vh-h)/2;
+}
+function reset(){
+  var vw=vp.clientWidth, vh=vp.clientHeight;
+  scale=Math.max(vw/MAPW, .58); minScale=Math.min(vw/MAPW, vh/MAPH)*.9;
+  tx=vw/2-700*scale; ty=vh/2-480*scale;
+  clamp(); apply();
+}
+setTimeout(reset,60);
+window.addEventListener("resize",function(){clamp();apply()});
+
+function zoomAt(f,cx,cy){
+  var ns=Math.min(2.6,Math.max(minScale,scale*f));
+  var k=ns/scale;
+  tx=cx-(cx-tx)*k; ty=cy-(cy-ty)*k; scale=ns;
+  clamp(); apply();
+}
+$S("#zoom-in").onclick=function(){zoomAt(1.3,vp.clientWidth/2,vp.clientHeight/2)};
+$S("#zoom-out").onclick=function(){zoomAt(1/1.3,vp.clientWidth/2,vp.clientHeight/2)};
+$S("#zoom-reset").onclick=reset;
+
+/* drag + pinch con pointer events */
+var pts=new Map(), lastDist=0, moved=false;
+vp.addEventListener("pointerdown",function(e){
+  vp.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  moved=false;
+});
+vp.addEventListener("pointermove",function(e){
+  if(!pts.has(e.pointerId))return;
+  var p=pts.get(e.pointerId);
+  var dx=e.clientX-p.x, dy=e.clientY-p.y;
+  if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+  if(pts.size===1){
+    tx+=dx; ty+=dy; clamp(); apply();
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  }else if(pts.size===2){
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    var arr=Array.from(pts.values());
+    var d=Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y);
+    var r=vp.getBoundingClientRect();
+    var cx=(arr[0].x+arr[1].x)/2-r.left, cy=(arr[0].y+arr[1].y)/2-r.top;
+    if(lastDist)zoomAt(d/lastDist,cx,cy);
+    lastDist=d;
+  }
+});
+function endP(e){pts.delete(e.pointerId);if(pts.size<2)lastDist=0}
+vp.addEventListener("pointerup",endP);
+vp.addEventListener("pointercancel",endP);
+vp.addEventListener("wheel",function(e){
+  e.preventDefault();
+  var r=vp.getBoundingClientRect();
+  zoomAt(e.deltaY<0?1.15:1/1.15,e.clientX-r.left,e.clientY-r.top);
+},{passive:false});
+
+/* ---------- ZONAS: bottom sheet ---------- */
+var sheet=$S("#zone-sheet"), sheetBody=$S("#sheet-body");
+function openZone(id){
+  var z=ZONES[id]; if(!z)return;
+  var nivelTag = z.nivel==="alto"
+    ? '<span class="risk-tag alto">● Riesgo alto</span>'
+    : '<span class="risk-tag medio">● Precaución</span>';
+  sheetBody.innerHTML=
+    '<div class="sheet-head"><h3>'+z.name+'</h3>'+nivelTag+'</div>'+
+    '<div class="muted" style="font-size:.83rem">'+z.fuente+'</div>'+
+    '<div class="sheet-stats">'+
+      '<div class="sstat"><b>'+z.alertas+'</b><span>alertas · 30 días</span></div>'+
+      '<div class="sstat"><b style="color:'+(z.nivel==='alto'?'#ff8d99':'#ffd28a')+'">'+z.trend+'</b><span>tendencia</span></div>'+
+      '<div class="sstat"><b>'+(z.comments.length+3)+'</b><span>reportes vecinos</span></div>'+
+    '</div>'+
+    '<h4>Tipos de incidente</h4>'+
+    '<div class="tipo-chips">'+z.tipos.map(function(t){return '<span>'+t[0]+'<b>'+t[1]+'</b></span>'}).join("")+'</div>'+
+    '<h4>Comentarios de la comunidad</h4>'+
+    z.comments.map(function(c){return '<div class="comment"><div class="ch"><b>'+c.who+'</b><small>'+c.when+'</small></div><p>'+c.txt+'</p></div>'}).join("")+
+    '<button class="sheet-route-btn" id="sheet-route">⚡ Trazar ruta esquivando esta zona</button>';
+  sheet.classList.add("open");
+  $S("#sheet-route").onclick=function(){sheet.classList.remove("open");showRoute()};
+}
+$$S(".zone-blob").forEach(function(el){
+  el.addEventListener("click",function(e){ if(!moved){ openZone(el.dataset.zone); e.stopPropagation(); }});
+});
+vp.addEventListener("click",function(e){ if(!moved && !e.target.classList.contains("zone-blob")) sheet.classList.remove("open"); });
+sheet.querySelector(".sheet-grab").addEventListener("click",function(){sheet.classList.remove("open")});
+
+/* ---------- RUTA DEMO ---------- */
+var routeCard=$S("#route-card"), routesG=$S("#routes"), safeP=$S("#route-safe");
+function showRoute(){
+  sheet.classList.remove("open");
+  routesG.style.display="block";
+  routeCard.classList.add("show");
+  var len=safeP.getTotalLength();
+  safeP.style.strokeDasharray=len; safeP.style.strokeDashoffset=len;
+  safeP.getBoundingClientRect();
+  safeP.style.transition="stroke-dashoffset 1.4s ease";
+  safeP.style.strokeDashoffset="0";
+  var vw=vp.clientWidth, vh=vp.clientHeight;
+  scale=Math.min(2.2,Math.max(.9, vw/420));
+  tx=vw/2-557*scale; ty=vh/2-500*scale; clamp(); apply();
+  toast("Ruta segura: +4 min, 0 zonas calientes");
+}
+$S("#btn-route").onclick=showRoute;
+$S("#route-close").onclick=function(){routeCard.classList.remove("show");routesG.style.display="none"};
+
+/* ---------- VECINO ALERTA ---------- */
+var qreport=$S("#qreport");
+$S("#fab-report").onclick=function(){qreport.classList.add("show");$S("#qr-done").style.display="none"};
+qreport.addEventListener("click",function(e){if(e.target===qreport)qreport.classList.remove("show")});
+$$S(".qr-grid button").forEach(function(b){
+  b.onclick=function(){
+    $S("#qr-done").style.display="block";
+    setTimeout(function(){qreport.classList.remove("show");toast("＋1 al mapa · gracias por cuidar a tu ciudad")},900);
+  };
+});
+
+/* ---------- FEED ALERTAS ---------- */
+var FEED=[
+  {f:"ia",src:"La Capital",cls:"news",txt:"Robo a mano armada en inmediaciones de Tablada. Geocodificado y sumado al mapa.",when:"hace 4 min · confianza 0.94"},
+  {f:"vecinos",src:"Vecino",cls:"user",txt:"Arrebato de celular en Córdoba y Paraguay. El de seguridad del banco lo vio todo.",when:"hace 9 min · centro"},
+  {f:"ia",src:"X / tránsito",cls:"x",txt:"Reporte de arrebato en Córdoba al 1200, pleno centro. Zona marcada en precaución.",when:"hace 11 min · confianza 0.88"},
+  {f:"vecinos",src:"Vecina",cls:"user",txt:"Luminaria rota y grupo merodeando en Pichincha, cortada de Güemes. +1 contexto nocturno.",when:"hace 31 min · verificada"},
+  {f:"ia",src:"FB Vecinal",cls:"fb",txt:"Grupo 'Vecinos Empalme Graneros': tiroteo cerca de las vías. Cruzado con 2 fuentes.",when:"hace 23 min · confianza 0.91"},
+  {f:"vecinos",src:"Repartidor",cls:"user",txt:"WOL me desvió de Ludueña a las 23. Llegué 6 min más tarde y entero.",when:"hace 1 h · flota Rappi"},
+  {f:"ia",src:"Rosario3",cls:"news",txt:"Refuerzan operativos en Ludueña tras los hechos del fin de semana. Riesgo recalibrado.",when:"ayer · confianza 0.9"},
+  {f:"ia",src:"911 abierto",cls:"news",txt:"Pico de llamados en zona sur entre 22 y 02 h. Ponderación horaria actualizada.",when:"ayer · dato agregado"}
+];
+var feedEl=$S("#alert-feed");
+function renderFeed(filter){
+  feedEl.innerHTML=FEED.filter(function(i){return filter==="todo"||i.f===filter}).map(function(i){
+    return '<div class="feed-item" style="border:1px solid var(--line);border-radius:13px;margin-bottom:9px;background:var(--panel)">'+
+      '<span class="src '+i.cls+'">'+i.src+'</span>'+
+      '<div><p>'+i.txt+'</p><small>'+i.when+'</small></div>'+
+    '</div>';
+  }).join("");
+}
+renderFeed("todo");
+$$S(".alert-tabs button").forEach(function(b){
+  b.onclick=function(){$$S(".alert-tabs button").forEach(function(x){x.classList.remove("on")});b.classList.add("on");renderFeed(b.dataset.f)};
+});
+
+/* ---------- SIREN SOUND (Web Audio API) ---------- */
+var sirenCtx=null;
+function playSiren(){
+  try{
+    if(sirenCtx)sirenCtx.close();
+    sirenCtx=new(window.AudioContext||window.webkitAudioContext)();
+    var ctx=sirenCtx;
+
+    // Create oscillator for the siren tone
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+
+    osc.type="sawtooth";
+    osc.frequency.value=600;
+    gain.gain.value=0.15;
+
+    // Frequency modulation for wailing siren effect
+    var lfo=ctx.createOscillator();
+    var lfoGain=ctx.createGain();
+    lfo.type="sine";
+    lfo.frequency.value=0.8; // Wail speed
+    lfoGain.gain.value=400; // Frequency swing
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    lfo.start(ctx.currentTime);
+    osc.start(ctx.currentTime);
+
+    // Second oscillator for two-tone effect (european police)
+    var osc2=ctx.createOscillator();
+    var gain2=ctx.createGain();
+    osc2.type="square";
+    osc2.frequency.value=800;
+    gain2.gain.value=0.08;
+
+    // Alternate with first oscillator
+    var lfo2=ctx.createOscillator();
+    var lfoGain2=ctx.createGain();
+    lfo2.type="square";
+    lfo2.frequency.value=1.6;
+    lfoGain2.gain.value=300;
+
+    lfo2.connect(lfoGain2);
+    lfoGain2.connect(osc2.frequency);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+
+    lfo2.start(ctx.currentTime);
+    osc2.start(ctx.currentTime);
+
+    // Stop after 5 seconds
+    var stopTime=ctx.currentTime+5;
+    gain.gain.setValueAtTime(0.15,stopTime-0.3);
+    gain.gain.linearRampToValueAtTime(0,stopTime);
+    gain2.gain.setValueAtTime(0.08,stopTime-0.3);
+    gain2.gain.linearRampToValueAtTime(0,stopTime);
+    lfo.stop(stopTime);
+    lfo2.stop(stopTime);
+    osc.stop(stopTime);
+    osc2.stop(stopTime);
+  }catch(e){
+    console.log("Audio no disponible:",e);
+  }
+}
+
+/* ---------- SOS ×7 ---------- */
+var WEBHOOK_URL="https://n8n.nrlabs.com.ar/webhook/wol-alert";
+var presses=0, pressTimer=null;
+var cnt=$S("#pwr-cnt"), emergency=$S("#emergency");
+$S("#pwr-sim").addEventListener("click",function(){
+  presses++;
+  if(navigator.vibrate)navigator.vibrate(20);
+  if(presses>=7){
+    presses=0; cnt.textContent="tocá 7 veces";
+    emergency.classList.add("show");
+    if(navigator.vibrate)navigator.vibrate([80,60,80,60,200]);
+    // SIRENA de alarma
+    playSiren();
+    // Enviar alerta al webhook de n8n
+    var userName=$S("#user-name").value.trim()||"Anónimo";
+    var userLoc=$S("#user-location").value||"Av. Pellegrini 3300";
+    fetch(WEBHOOK_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:userName,location:userLoc})
+    }).then(function(r){return r.json()}).then(function(d){
+      console.log("Alerta enviada a central:",d);
+      toast("⚠️ Alerta enviada a central · "+userName);
+    }).catch(function(e){
+      console.error("Error enviando alerta:",e);
+      toast("⚠️ Emergencia local · sin conexión a central");
+    });
+  }else{
+    cnt.textContent=presses+" / 7 — seguí";
+  }
+  clearTimeout(pressTimer);
+  pressTimer=setTimeout(function(){presses=0;cnt.textContent="tocá 7 veces"},1800);
+});
+$S("#em-cancel").onclick=function(){
+  emergency.classList.remove("show");
+  if(sirenCtx){sirenCtx.close();sirenCtx=null;}
+  toast("Alerta cancelada con PIN · tu gente fue avisada");
+};
+
+})();
+</script>
+
+</body>
+</html>

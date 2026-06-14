@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WOL · Central de Monitoreo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0a0c11;--night-2:#0e1118;--panel:#12151d;--panel-2:#171b25;
+  --line:#242a38;--line-2:#303749;--volt:#e7ff2b;--safe:#38d98f;
+  --warn:#f5b945;--hot:#ff4a5e;--fog:#97a0b4;--fog-2:#6a7388;--white:#f2f4f8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--night);color:var(--white);font-family:'Inter',system-ui,sans-serif;
+  height:100vh;overflow:hidden;display:flex;flex-direction:column;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(900px 500px at 80% 10%,rgba(231,255,43,.05),transparent 70%),
+             radial-gradient(600px 400px at 20% 90%,rgba(255,74,94,.06),transparent 70%);
+}
+
+/* TOP BAR */
+.topbar{
+  position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;
+  padding:14px 24px;border-bottom:1px solid var(--line);background:rgba(10,12,17,.9);backdrop-filter:blur(10px);
+  flex:none;
+}
+.topbar .brand{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif}
+.topbar .brand h1{font-size:1.4rem;letter-spacing:.04em;font-weight:700}
+.topbar .brand .badge{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--safe);padding:4px 9px;border-radius:6px;border:1px solid rgba(56,217,143,.35);background:rgba(56,217,143,.08);
+}
+.live-indicator{display:flex;align-items:center;gap:16px}
+.live-indicator .pulse{
+  display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--safe);
+}
+.live-indicator .pulse i{width:8px;height:8px;border-radius:50%;background:var(--safe);animation:blink 1.4s infinite}
+.live-indicator .alert-count{
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.8rem;color:var(--hot);line-height:1;
+}
+.live-indicator small{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--fog-2);letter-spacing:.06em}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* MAIN LAYOUT */
+.main{position:relative;z-index:1;flex:1;display:grid;grid-template-columns:320px 1fr;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{
+  border-right:1px solid var(--line);background:rgba(12,15,20,.8);backdrop-filter:blur(6px);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sidebar-head{
+  padding:16px 18px;border-bottom:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--fog-2);flex:none;
+}
+.sidebar-head b{color:var(--white)}
+.alert-list{flex:1;overflow-y:auto;padding:8px 12px}
+.alert-item{
+  display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--line);background:var(--panel);margin-bottom:8px;
+  animation:slideIn .35s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.alert-item.new{border-color:rgba(255,74,94,.5);background:rgba(255,74,94,.08)}
+.alert-item .dot{
+  flex:none;width:10px;height:10px;border-radius:50%;background:var(--hot);margin-top:4px;
+  box-shadow:0 0 10px rgba(255,74,94,.6);
+}
+.alert-item .dot.pulse-dot{animation:dotPulse 1.2s infinite}
+@keyframes dotPulse{0%,100%{box-shadow:0 0 6px rgba(255,74,94,.5)}50%{box-shadow:0 0 20px rgba(255,74,94,.9),0 0 40px rgba(255,74,94,.3)}}
+.alert-item .info{flex:1;min-width:0}
+.alert-item .info b{display:block;font-size:.92rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-item .info span{font-size:.78rem;color:var(--fog)}
+.alert-item .time{
+  flex:none;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--fog-2);white-space:nowrap;
+}
+.empty-state{
+  text-align:center;padding:40px 20px;color:var(--fog-2);
+  font-size:.9rem;
+}
+.empty-state .icon{font-size:2.5rem;display:block;margin-bottom:10px}
+
+/* MAP AREA */
+.map-area{
+  position:relative;overflow:hidden;background:#080b10;flex:1;
+}
+#rosario-map-svg{position:absolute;top:0;left:0;width:100%;height:100%}
+#rosario-map-svg svg{width:100%;height:100%}
+/* Reuse same styles from phone sim */
+.street-name{font-family:'JetBrains Mono',monospace;fill:#5b6478;font-size:11px;letter-spacing:.08em;pointer-events:none}
+.landmark{font-family:'Inter',sans-serif;fill:#8b94aa;font-size:11.5px;pointer-events:none}
+.zlabel{font-family:'JetBrains Mono',monospace;fill:#aab2c6;font-size:13px;letter-spacing:.04em;pointer-events:none;text-transform:uppercase}
+.zlabel.hot{fill:#ffb3bb}
+.zlabel.warnl{fill:#ffe2a8}
+
+/* POLICE CARS */
+.police-car{
+  position:absolute;z-index:20;pointer-events:none;
+  font-size:28px;filter:drop-shadow(0 0 6px rgba(56,180,255,.7));
+  transition:left 3s cubic-bezier(.4,0,.2,1),top 3s cubic-bezier(.4,0,.2,1);
+  transform:translate(-50%,-50%);
+}
+.police-car .lights{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;
+}
+.police-car .lights span{width:5px;height:5px;border-radius:50%;animation:policeFlash .35s infinite alternate}
+.police-car .lights span:nth-child(1){background:#ff2222;animation-delay:0s}
+.police-car .lights span:nth-child(2){background:#3366ff;animation-delay:.18s}
+@keyframes policeFlash{from{opacity:.3;box-shadow:none}to{opacity:1;box-shadow:0 0 10px currentColor}}
+
+/* Alert pulse on map */
+.alert-pulse{
+  position:absolute;z-index:16;pointer-events:none;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--hot);
+  transform:translate(-50%,-50%);
+  box-shadow:0 0 18px rgba(255,74,94,.9),0 0 40px rgba(255,74,94,.4);
+  animation:alertHeartbeat .8s infinite;
+}
+@keyframes alertHeartbeat{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.4)}}
+.alert-pulse::before{
+  content:"";position:absolute;inset:-8px;border-radius:50%;
+  border:3px solid rgba(255,74,94,.7);animation:sonarPulse 1.8s infinite;
+}
+.alert-pulse::after{
+  content:attr(data-name);position:absolute;top:-26px;left:50%;transform:translateX(-50%);
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--white);white-space:nowrap;
+  background:rgba(10,12,17,.9);padding:4px 9px;border-radius:6px;border:1px solid rgba(255,74,94,.5);
+  font-weight:700;
+}
+@keyframes sonarPulse{0%{transform:scale(.4);opacity:1}100%{transform:scale(3);opacity:0}}
+
+/* Legend */
+.map-legend{
+  position:absolute;bottom:20px;left:20px;z-index:10;display:flex;gap:14px;
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.04em;color:var(--fog);
+  padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:rgba(13,16,23,.9);backdrop-filter:blur(6px);
+}
+.map-legend i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+
+/* Responsive */
+@media(max-width:860px){
+  .main{grid-template-columns:1fr;grid-template-rows:1fr 280px}
+  .sidebar{border-right:0;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <h1>⚡ WOL · Central de Monitoreo</h1>
+    <span class="badge">Rosario</span>
+  </div>
+  <div class="live-indicator">
+    <span class="pulse"><i></i>En vivo</span>
+    <div style="text-align:center">
+      <span class="alert-count" id="alert-count">0</span>
+      <small>alertas activas</small>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-head">📋 <b>Registro de alertas</b> · más recientes primero</div>
+    <div class="alert-list" id="alert-list">
+      <div class="empty-state">
+        <span class="icon">🟢</span>
+        <p>Sin alertas activas.<br>Esperando señales de WOL-phone-sim…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-area" id="map-area">
+    <div id="rosario-map-svg">
+      <svg width="1100" height="900" viewBox="0 0 1100 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <defs>
+          <filter id="blob-ctrl" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="18"/>
+          </filter>
+          <filter id="blobsoft-ctrl" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="26"/>
+          </filter>
+        </defs>
+
+        <rect width="1100" height="900" fill="#080b10"/>
+
+        <!-- street grid -->
+        <g stroke="#151a26" stroke-width="1.5">
+          <path d="M240 200H900M240 250H910M240 300H920M240 350H930M240 400H930M240 450H920M240 500H910M240 550H900M240 600H890M240 650H880M240 700H870"/>
+          <path d="M290 180V750M340 180V770M390 180V790M440 180V810M490 180V830M540 180V840M590 190V850M640 200V840M690 220V830"/>
+        </g>
+        <g stroke="#111722" stroke-width="1.5">
+          <path d="M260 760H800M260 820H780M260 880H760M300 760V900M380 760V900M460 760V900M540 780V900M620 780V900"/>
+          <path d="M260 60H700M260 110H720M300 20V180M380 20V180M460 30V190M520 40V190"/>
+        </g>
+
+        <!-- Circunvalación -->
+        <path d="M390 10 C220 100 110 260 110 480 C110 720 180 920 430 900" stroke="#1e2638" stroke-width="7" fill="none"/>
+        <text class="street-name" x="118" y="460" transform="rotate(-87 128 460)">AV. CIRCUNVALACIÓN</text>
+
+        <!-- Bv. Oroño -->
+        <path d="M560 180 V850" stroke="#262e3f" stroke-width="6" fill="none"/>
+        <text class="street-name" x="570" y="320" transform="rotate(90 570 320)">BV. OROÑO</text>
+
+        <!-- Av. Pellegrini -->
+        <path d="M230 540 H850" stroke="#262e3f" stroke-width="6" fill="none"/>
+        <text class="street-name" x="280" y="532">AV. PELLEGRINI</text>
+
+        <!-- Córdoba -->
+        <path d="M260 420 H860" stroke="#222938" stroke-width="4" fill="none"/>
+        <text class="street-name" x="390" y="412">CÓRDOBA</text>
+
+        <!-- 27 de Febrero -->
+        <path d="M240 660 H830" stroke="#222938" stroke-width="4" fill="none"/>
+        <text class="street-name" x="280" y="652">BV. 27 DE FEBRERO</text>
+
+        <!-- Río Paraná -->
+        <path d="M680 0 C740 80 820 180 860 310 C900 440 910 600 905 730 C898 890 910 900 940 900 L1100 900 L1100 0 Z" fill="#0f2030"/>
+        <path d="M680 0 C740 80 820 180 860 310 C900 440 910 600 905 730" stroke="#1f3d5c" stroke-width="2.5" fill="none"/>
+        <text class="landmark" x="905" y="500" fill="#4f7ba3" font-style="italic" transform="rotate(83 905 500)">Río Paraná</text>
+
+        <!-- Parque Independencia -->
+        <ellipse cx="545" cy="600" rx="58" ry="44" fill="#132618" stroke="#25452f" stroke-width="2"/>
+        <text class="landmark" x="545" y="604" text-anchor="middle" fill="#69a87e" font-size="10">Pque. Independencia</text>
+
+        <!-- Zonas calientes -->
+        <g id="zones-ctrl">
+          <ellipse cx="300" cy="170" rx="82" ry="58" fill="rgba(255,74,94,.28)" filter="url(#blobsoft-ctrl)"/>
+          <ellipse cx="300" cy="170" rx="42" ry="28" fill="rgba(255,74,94,.42)" filter="url(#blob-ctrl)"/>
+          <text class="zlabel hot" x="300" y="173" text-anchor="middle">Empalme Graneros</text>
+
+          <ellipse cx="390" cy="270" rx="66" ry="48" fill="rgba(255,74,94,.26)" filter="url(#blobsoft-ctrl)"/>
+          <ellipse cx="390" cy="270" rx="34" ry="24" fill="rgba(255,74,94,.4)" filter="url(#blob-ctrl)"/>
+          <text class="zlabel hot" x="390" y="273" text-anchor="middle">Ludueña</text>
+
+          <ellipse cx="510" cy="120" rx="68" ry="46" fill="rgba(255,74,94,.25)" filter="url(#blobsoft-ctrl)"/>
+          <text class="zlabel hot" x="510" y="123" text-anchor="middle">Triángulo y Moderno</text>
+
+          <ellipse cx="350" cy="500" rx="62" ry="46" fill="rgba(255,74,94,.27)" filter="url(#blobsoft-ctrl)"/>
+          <ellipse cx="350" cy="500" rx="32" ry="24" fill="rgba(255,74,94,.42)" filter="url(#blob-ctrl)"/>
+          <text class="zlabel hot" x="350" y="503" text-anchor="middle">Villa Banana</text>
+
+          <ellipse cx="410" cy="640" rx="64" ry="46" fill="rgba(255,74,94,.25)" filter="url(#blobsoft-ctrl)"/>
+          <text class="zlabel hot" x="410" y="643" text-anchor="middle">Bella Vista</text>
+
+          <ellipse cx="630" cy="740" rx="70" ry="50" fill="rgba(255,74,94,.28)" filter="url(#blobsoft-ctrl)"/>
+          <ellipse cx="630" cy="740" rx="36" ry="26" fill="rgba(255,74,94,.44)" filter="url(#blob-ctrl)"/>
+          <text class="zlabel hot" x="630" y="743" text-anchor="middle">Tablada</text>
+
+          <ellipse cx="780" cy="450" rx="66" ry="52" fill="rgba(245,185,69,.22)" filter="url(#blobsoft-ctrl)"/>
+          <text class="zlabel warnl" x="780" y="453" text-anchor="middle">Centro</text>
+
+          <ellipse cx="700" cy="340" rx="52" ry="38" fill="rgba(245,185,69,.22)" filter="url(#blobsoft-ctrl)"/>
+          <text class="zlabel warnl" x="700" y="343" text-anchor="middle">Pichincha</text>
+        </g>
+
+        <!-- Landmarks -->
+        <rect x="850" y="400" width="10" height="24" fill="#c8cfdf"/>
+        <text class="landmark" x="868" y="410">Monumento</text>
+        <text class="landmark" x="868" y="423">a la Bandera</text>
+
+        <circle cx="650" cy="540" r="8" fill="#e7ff2b" stroke="#080b10" stroke-width="2"/>
+        <text class="landmark" x="650" y="525" text-anchor="middle" fill="#e7ff2b" font-weight="600">UCA Rosario</text>
+
+        <!-- COMISARÍA (police station) -->
+        <rect x="500" y="385" width="22" height="30" fill="#4a6fa0" rx="3"/>
+        <text class="landmark" x="511" y="375" text-anchor="middle" fill="#7a9fd0" font-weight="600" font-size="10">Comisaría 2ª</text>
+
+        <!-- Dynamic layer for alerts -->
+        <g id="alert-layer"></g>
+      </svg>
+      <!-- Dynamic HTML overlays (police cars, alert pulses) - inside SVG wrapper for correct coords -->
+      <div id="overlay-layer" style="position:absolute;inset:0;pointer-events:none;z-index:15;overflow:visible"></div>
+    </div>
+
+    <div class="map-legend">
+      <span><i style="background:#38d98f"></i>Seguro</span>
+      <span><i style="background:#f5b945"></i>Precaución</span>
+      <span><i style="background:#ff4a5e"></i>Caliente</span>
+      <span><i style="background:#3366ff"></i>Comisaría</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var WEBHOOK_URL="https://n8n.nrlabs.com.ar/webhook/wol-alert";
+var POLL_INTERVAL=2000;
+var SVG_W=1100, SVG_H=900;
+var knownAlertIds={};
+var alertCount=0;
+
+/* ---------- LOCATION -> MAP COORDINATES (SVG viewBox coords) ---------- */
+var LOCATIONS={
+  "Av. Pellegrini 3300":{x:650,y:540,label:"UCA · Pellegrini 3300"},
+  "Centro":{x:780,y:450,label:"Centro"},
+  "Pichincha":{x:700,y:340,label:"Pichincha"},
+  "Ludueña":{x:390,y:270,label:"Ludueña"},
+  "Empalme Graneros":{x:300,y:170,label:"Empalme Graneros"},
+  "Tablada":{x:630,y:740,label:"Tablada"},
+  "Villa Banana":{x:350,y:500,label:"Villa Banana"},
+  "Bella Vista":{x:410,y:640,label:"Bella Vista"},
+  "Las Flores":{x:520,y:800,label:"Las Flores"},
+  "Triangulo":{x:510,y:120,label:"Triángulo"},
+  "Triángulo":{x:510,y:120,label:"Triángulo"},
+  "Via Honda":{x:540,y:780,label:"Vía Honda"},
+  "Vía Honda":{x:540,y:780,label:"Vía Honda"}
+};
+
+var STATION={x:511,y:400};
+
+/* ---------- DOM refs ---------- */
+var alertListEl=document.getElementById("alert-list");
+var alertCountEl=document.getElementById("alert-count");
+var overlayEl=document.getElementById("overlay-layer");
+var svgWrapper=document.getElementById("rosario-map-svg");
+
+/* ---------- Convert SVG viewBox coords to overlay % ---------- */
+function svgToPct(svgX,svgY){
+  return {x:(svgX/SVG_W*100)+"%",y:(svgY/SVG_H*100)+"%"};
+}
+
+function getCoords(locationStr){
+  if(!locationStr)locationStr="";
+  var best=null;
+  for(var key in LOCATIONS){
+    if(locationStr.toLowerCase().indexOf(key.toLowerCase())!==-1){
+      return LOCATIONS[key];
+    }
+  }
+  return {x:550+Math.random()*200,y:400+Math.random()*200,label:locationStr||"Desconocido"};
+}
+
+function fmtRelative(ts){
+  var diff=Date.now()-new Date(ts).getTime();
+  var sec=Math.floor(diff/1000);
+  if(sec<60)return "ahora";
+  if(sec<3600)return Math.floor(sec/60)+" min";
+  return Math.floor(sec/3600)+" h";
+}
+
+/* ---------- POLICE CARS (3 por alerta) ---------- */
+function spawnPoliceCar(targetX,targetY,alertName,delay){
+  delay=delay||0;
+  setTimeout(function(){
+    var car=document.createElement("div");
+    car.className="police-car";
+    car.innerHTML='<div class="lights"><span></span><span></span></div>🚔';
+
+    var from=svgToPct(STATION.x,STATION.y);
+    car.style.left=from.x;
+    car.style.top=from.y;
+
+    overlayEl.appendChild(car);
+
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        var to=svgToPct(targetX,targetY);
+        car.style.left=to.x;
+        car.style.top=to.y;
+      });
+    });
+
+    setTimeout(function(){
+      if(car.parentNode)car.parentNode.removeChild(car);
+    },3500);
+  },delay);
+}
+
+function spawnAlertPulse(x,y,name){
+  var pulse=document.createElement("div");
+  pulse.className="alert-pulse";
+  pulse.setAttribute("data-name",name||"");
+
+  var pct=svgToPct(x,y);
+  pulse.style.left=pct.x;
+  pulse.style.top=pct.y;
+
+  overlayEl.appendChild(pulse);
+
+  setTimeout(function(){
+    if(pulse.parentNode)pulse.parentNode.removeChild(pulse);
+  },30000);
+}
+
+/* ---------- SIDEBAR ---------- */
+function addAlertToSidebar(alert,isNew){
+  if(knownAlertIds[alert.id])return;
+  knownAlertIds[alert.id]=true;
+  alertCount++;
+  alertCountEl.textContent=alertCount;
+
+  var empty=alertListEl.querySelector(".empty-state");
+  if(empty)empty.remove();
+
+  var coords=getCoords(alert.location);
+  // Jitter: small random offset so multiple alerts in same zone don't perfectly overlap
+  var jx=coords.x+(Math.random()-0.5)*40;
+  var jy=coords.y+(Math.random()-0.5)*30;
+
+  var item=document.createElement("div");
+  item.className="alert-item"+(isNew?" new":"");
+  item.innerHTML=
+    '<div class="dot'+(isNew?' pulse-dot':'')+'"></div>'+
+    '<div class="info"><b>'+escapeHTML(alert.name)+'</b><span>📍 '+escapeHTML(coords.label)+'</span></div>'+
+    '<span class="time">'+fmtRelative(alert.timestamp)+'</span>';
+
+  alertListEl.insertBefore(item,alertListEl.firstChild);
+
+  // Spawn alert pulse
+  spawnAlertPulse(jx,jy,alert.name);
+
+  // Spawn 3 police cars with staggered delays
+  spawnPoliceCar(jx,jy,alert.name,0);
+  spawnPoliceCar(jx-20,jy+15,alert.name,400);
+  spawnPoliceCar(jx+25,jy-10,alert.name,800);
+
+  if(isNew){
+    setTimeout(function(){item.classList.remove("new");var dot=item.querySelector(".dot");if(dot)dot.classList.remove("pulse-dot");},3000);
+  }
+}
+
+function escapeHTML(str){
+  var div=document.createElement("div");
+  div.textContent=str;
+  return div.innerHTML;
+}
+
+/* ---------- POLLING ---------- */
+function pollAlerts(){
+  fetch(WEBHOOK_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:"{}"
+  }).then(function(r){return r.json()}).then(function(data){
+    if(data.status!=="ok"||!data.alerts)return;
+    var alerts=data.alerts;
+    for(var i=0;i<alerts.length;i++){
+      var alert=alerts[i];
+      var isNew=!knownAlertIds[alert.id];
+      addAlertToSidebar(alert,isNew);
+    }
+  }).catch(function(e){
+    console.error("Poll error:",e);
+  });
+}
+
+pollAlerts();
+setInterval(pollAlerts,POLL_INTERVAL);
+
+window.addEventListener("resize",function(){
+  overlayEl.innerHTML="";
+  // Re-spawn pulses for known alerts on resize
+});
+
+})();
+</script>
+
+</body>
+</html>
